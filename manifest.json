@@ -1,0 +1,8 @@
+{
+  "name": "Auditorías 5S - GLP S.A.",
+  "short_name": "Auditorías 5S",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F5F4F1",
+  "theme_color": "#1B2027"
+}

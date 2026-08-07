@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Auditorías 5S · GLP S.A.</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B2027">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Auditorías 5S">
+
+<!-- Generación de PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  --bg:#F5F4F1;
+  --surface:#FFFFFF;
+  --ink:#1B2027;
+  --ink-soft:#5B6570;
+  --steel:#3D5A73;
+  --steel-dark:#28404F;
+  --accent:#F2A93B;
+  --accent-dark:#D48F1E;
+  --bien:#3F8F5F;
+  --regular:#E0A63C;
+  --mal:#C0392B;
+  --na:#9AA5AD;
+  --line:#E4E1DA;
+  --radius:10px;
+  --shadow:0 2px 10px rgba(27,32,39,.08);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);}
+body{padding-bottom:60px;-webkit-tap-highlight-color:transparent;}
+h1,h2,h3{margin:0;line-height:1.15;}
+button{font-family:inherit;}
+.hidden{display:none !important;}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+header.app-header{
+  background:var(--ink);
+  color:#fff;
+  padding:18px 20px 16px;
+  position:relative;
+  overflow:hidden;
+}
+header.app-header::after{
+  content:"";
+  position:absolute; left:0; right:0; bottom:0;
+  height:4px;
+  background:repeating-linear-gradient(135deg,var(--accent) 0 10px,var(--accent-dark) 10px 20px);
+}
+header.app-header .eyebrow{
+  font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);font-weight:700;margin-bottom:2px;
+}
+header.app-header h1{font-size:20px;font-weight:800;}
+header.app-header .user-line{
+  margin-top:8px;font-size:13px;color:#C9CFD4;
+  display:flex;align-items:center;gap:6px;
+}
+header.app-header .user-line .dot{
+  width:7px;height:7px;border-radius:50%;background:var(--bien);flex:none;
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+main{max-width:640px;margin:0 auto;padding:16px;}
+.card{
+  background:var(--surface);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:18px;
+  margin-bottom:14px;
+}
+.card h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--steel-dark);margin-bottom:12px;}
+.field{margin-bottom:14px;}
+.field:last-child{margin-bottom:0;}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;}
+.field input[type=text],
+.field input[type=number],
+.field input[type=datetime-local],
+.field select,
+.field textarea{
+  width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:8px;
+  font-size:15px;color:var(--ink);background:#fff;
+}
+.field textarea{min-height:70px;resize:vertical;font-family:inherit;}
+.field .readonly-box{
+  background:#F7F6F3;border:1.5px dashed var(--line);border-radius:8px;
+  padding:10px 12px;font-size:13.5px;color:var(--ink-soft);min-height:20px;
+}
+
+/* segmented controls */
+.segmented{display:flex;gap:6px;flex-wrap:wrap;}
+.segmented button{
+  flex:1 1 auto;min-width:64px;
+  border:1.5px solid var(--line);background:#fff;color:var(--ink-soft);
+  padding:10px 6px;border-radius:8px;font-size:13.5px;font-weight:700;
+  cursor:pointer;transition:.12s;
+}
+.segmented button.active{color:#fff;border-color:transparent;}
+.segmented.linea button.active,.segmented.etapa button.active{background:var(--steel);}
+
+/* checklist item */
+.checklist-item{border-top:1px solid var(--line);padding:14px 0;}
+.checklist-item:first-of-type{border-top:none;padding-top:0;}
+.checklist-item .n{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:50%;background:var(--steel);color:#fff;
+  font-size:12px;font-weight:800;margin-right:8px;flex:none;
+}
+.checklist-item .desc{font-size:14.5px;font-weight:600;display:flex;align-items:flex-start;margin-bottom:10px;}
+.rating{display:flex;gap:6px;}
+.rating button{
+  flex:1;padding:10px 4px;border-radius:8px;border:1.5px solid var(--line);
+  background:#fff;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--ink-soft);
+}
+.rating button[data-val="1"].active{background:var(--bien);border-color:var(--bien);color:#fff;}
+.rating button[data-val="2"].active{background:var(--regular);border-color:var(--regular);color:#fff;}
+.rating button[data-val="3"].active{background:var(--mal);border-color:var(--mal);color:#fff;}
+.rating button[data-val="4"].active{background:var(--na);border-color:var(--na);color:#fff;}
+
+/* nivel aplicacion */
+.nivel-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
+.nivel-row:first-of-type{border-top:none;}
+.nivel-row .label{font-size:14px;font-weight:600;flex:1;}
+.nivel-row .segmented{flex:none;width:180px;}
+.nivel-row .segmented button{min-width:0;padding:8px 4px;font-size:12px;}
+.nivel-row .segmented button.active{background:var(--steel);}
+
+/* acciones correctivas */
+.accion-row{
+  border:1.5px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px;position:relative;
+}
+.accion-row .quitar{
+  position:absolute;top:8px;right:8px;border:none;background:none;color:var(--mal);
+  font-size:18px;font-weight:800;cursor:pointer;line-height:1;padding:4px;
+}
+.btn-add{
+  width:100%;padding:12px;border:1.5px dashed var(--steel);border-radius:8px;
+  background:none;color:var(--steel-dark);font-weight:700;font-size:14px;cursor:pointer;
+}
+
+/* buttons */
+.btn-primary{
+  width:100%;padding:15px;border:none;border-radius:10px;background:var(--accent);
+  color:var(--ink);font-weight:800;font-size:16px;cursor:pointer;box-shadow:var(--shadow);
+}
+.btn-primary:disabled{opacity:.5;}
+.btn-secondary{
+  width:100%;padding:14px;border:1.5px solid var(--steel);border-radius:10px;background:none;
+  color:var(--steel-dark);font-weight:700;font-size:15px;cursor:pointer;margin-top:10px;
+}
+
+/* result screen */
+.nota-gauge{
+  text-align:center;padding:26px 18px;
+}
+.nota-gauge .num{font-size:56px;font-weight:900;line-height:1;}
+.nota-gauge .lbl{font-size:13px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin-top:6px;}
+
+/* status screens */
+.status-screen{text-align:center;padding:60px 24px;}
+.status-screen .spinner{
+  width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--steel);
+  margin:0 auto 18px;animation:spin 0.8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.status-screen h2{font-size:17px;margin-bottom:8px;text-transform:none;letter-spacing:0;color:var(--ink);}
+.status-screen p{font-size:14px;color:var(--ink-soft);line-height:1.5;}
+
+@media(prefers-reduced-motion: reduce){
+  .status-screen .spinner{animation:none;}
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="eyebrow">Gente de la Pampa S.A.</div>
+  <h1>Auditorías 5S</h1>
+  <div class="user-line" id="user-line hidden"></div>
+</header>
+
+<main>
+
+  <!-- ===================== PANTALLA: CARGANDO ===================== -->
+  <section id="screen-loading" class="status-screen">
+    <div class="spinner"></div>
+    <h2>Verificando acceso…</h2>
+    <p>Conectando con el sistema y confirmando tu usuario.</p>
+  </section>
+
+  <!-- ===================== PANTALLA: SIN ACCESO ===================== -->
+  <section id="screen-unauthorized" class="status-screen hidden">
+    <h2 id="unauth-title">No pudimos verificar tu acceso</h2>
+    <p id="unauth-msg"></p>
+  </section>
+
+  <!-- ===================== PANTALLA: FORMULARIO ===================== -->
+  <section id="screen-form" class="hidden">
+
+    <div class="card">
+      <h2>Datos de la ronda</h2>
+      <div class="field">
+        <label>Línea</label>
+        <div class="segmented linea" id="sel-linea"></div>
+      </div>
+      <div class="field">
+        <label>Etapa</label>
+        <div class="segmented etapa" id="sel-etapa"></div>
+      </div>
+      <div class="field">
+        <label>Responsable del sector</label>
+        <select id="sel-responsable"><option value="">Elegí línea y etapa primero</option></select>
+      </div>
+      <div class="field">
+        <label>Sector / equipos a auditar</label>
+        <div class="readonly-box" id="txt-sector-equipos">—</div>
+      </div>
+      <div class="field">
+        <label>Fecha y hora</label>
+        <input type="datetime-local" id="inp-fecha">
+      </div>
+      <div class="field">
+        <label>Resp. Higiene y Seguridad</label>
+        <input type="text" id="inp-higiene" placeholder="Nombre (opcional)">
+      </div>
+      <div class="field">
+        <label>Acompañantes</label>
+        <input type="text" id="inp-acompanantes" placeholder="Ej: Filippi, Bogino">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Ronda 5S — Requisitos mínimos</h2>
+      <div id="checklist-container"></div>
+    </div>
+
+    <div class="card">
+      <h2>Nivel de aplicación logrado</h2>
+      <div id="nivel-container"></div>
+    </div>
+
+    <div class="card">
+      <h2>Comentarios y observaciones</h2>
+      <div class="field">
+        <textarea id="inp-comentarios" placeholder="Observaciones generales de la ronda…"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Acciones correctivas</h2>
+      <div id="acciones-container"></div>
+      <button type="button" class="btn-add" id="btn-add-accion">+ Agregar acción correctiva</button>
+    </div>
+
+    <button type="button" class="btn-primary" id="btn-guardar">Guardar auditoría</button>
+  </section>
+
+  <!-- ===================== PANTALLA: RESULTADO ===================== -->
+  <section id="screen-result" class="hidden">
+    <div class="card nota-gauge">
+      <div class="num" id="res-nota">–</div>
+      <div class="lbl">Nota final de la auditoría</div>
+    </div>
+    <div class="card">
+      <p id="res-detalle" style="font-size:14px;color:var(--ink-soft);line-height:1.5;margin:0;"></p>
+    </div>
+    <button type="button" class="btn-primary" id="btn-pdf">Descargar / compartir PDF</button>
+    <button type="button" class="btn-secondary" id="btn-nueva">Nueva auditoría</button>
+  </section>
+
+</main>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN — EDITAR ACÁ
+   ============================================================ */
+// Pegá la URL del Web App que copiaste al deployar el Code.gs (README_Setup_Backend.md, paso 6)
+const API_URL = 'PEGAR_AQUI_LA_URL_DE_TU_WEB_APP';
+
+// Nombres de los 4 niveles de "Nivel de aplicación logrado". Tu Excel solo tenía
+// columnas numeradas 1-4 sin etiqueta — si tenés nombres definidos para esos niveles,
+// reemplazalos acá.
+const LEVEL_LABELS = ['Nivel 1', 'Nivel 2', 'Nivel 3', 'Nivel 4'];
+
+const NIVEL_COMPONENTES = [
+  { key: 'separar',       label: 'Separar' },
+  { key: 'organizar',     label: 'Organizar' },
+  { key: 'limpiar',       label: 'Limpiar' },
+  { key: 'estandarizar',  label: 'Estandarizar' },
+  { key: 'autodisciplina',label: 'Autodisciplina' }
+];
+
+const RATING_LABELS = { 1: 'Bien', 2: 'Regular', 3: 'Mal', 4: 'N/A' };
+
+/* ============================================================
+   ESTADO
+   ============================================================ */
+let usuario = null;
+let config = null;          // { sectores:[], checklist:[] }
+let itemRatings = {};        // { nItem: 1-4 }
+let nivelValues = {};        // { separar: 1-4, ... }
+let accionesRows = [];       // [{id, descripcion, responsable, plazoDias}]
+let lastAuditoria = null;    // payload + resultado, para el PDF
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', init);
+
+async function init() {
+  if (API_URL.indexOf('PEGAR_AQUI') !== -1) {
+    showUnauthorized('Falta configurar la app', 'Todavía no se pegó la URL del backend (API_URL) en index.html. Avisale al administrador del sistema.');
+    return;
+  }
+  try {
+    const who = await apiGet('whoami');
+    if (!who.autorizado) {
+      showUnauthorized('Tu cuenta no está habilitada', (who.error || 'Usuario no habilitado.') + (who.email ? ('\n\nCuenta detectada: ' + who.email) : ''));
+      return;
+    }
+    usuario = who;
+    document.getElementById('user-line').classList.remove('hidden');
+    document.getElementById('user-line').innerHTML = '<span class="dot"></span> ' + usuario.nombre + ' · ' + usuario.rol;
+
+    config = await apiGet('config');
+    buildForm();
+    showScreen('form');
+  } catch (err) {
+    showUnauthorized('No se pudo conectar', 'Revisá tu conexión a internet y que hayas iniciado sesión con tu cuenta de Google del trabajo en este navegador.\n\nDetalle técnico: ' + err.message);
+  }
+}
+
+function showScreen(name) {
+  ['loading', 'unauthorized', 'form', 'result'].forEach(s => {
+    document.getElementById('screen-' + s).classList.toggle('hidden', s !== name);
+  });
+}
+
+function showUnauthorized(title, msg) {
+  document.getElementById('unauth-title').textContent = title;
+  document.getElementById('unauth-msg').textContent = msg;
+  showScreen('unauthorized');
+}
+
+/* ============================================================
+   API HELPERS
+   ============================================================ */
+async function apiGet(action, params) {
+  const qs = new URLSearchParams(Object.assign({ action: action }, params || {}));
+  const res = await fetch(API_URL + '?' + qs.toString());
+  return res.json();
+}
+
+async function apiPost(action, data) {
+  // Content-Type text/plain evita el preflight OPTIONS, que Apps Script no maneja.
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: action, data: data })
+  });
+  return res.json();
+}
+
+/* ============================================================
+   ARMADO DEL FORMULARIO
+   ============================================================ */
+function buildForm() {
+  // Fecha/hora por defecto: ahora
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('inp-fecha').value = now.toISOString().slice(0, 16);
+
+  buildSegmented('sel-linea', ['Soja', 'Girasol'], onFiltroChange);
+  buildSegmented('sel-etapa', ['Preparación', 'Extracción', 'Pelleteado'], onFiltroChange);
+
+  buildChecklist();
+  buildNivelAplicacion();
+
+  document.getElementById('sel-responsable').addEventListener('change', onResponsableChange);
+  document.getElementById('btn-add-accion').addEventListener('click', () => addAccionRow());
+  document.getElementById('btn-guardar').addEventListener('click', guardarAuditoria);
+  document.getElementById('btn-pdf').addEventListener('click', generarPDF);
+  document.getElementById('btn-nueva').addEventListener('click', () => location.reload());
+}
+
+function buildSegmented(containerId, options, onChange) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = opt;
+    btn.dataset.value = opt;
+    if (i === 0) btn.classList.add('active');
+    btn.addEventListener('click', () => {
+      [...el.children].forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      onChange();
+    });
+    el.appendChild(btn);
+  });
+}
+
+function getSegmentedValue(containerId) {
+  const active = document.querySelector('#' + containerId + ' button.active');
+  return active ? active.dataset.value : null;
+}
+
+function onFiltroChange() {
+  const linea = getSegmentedValue('sel-linea');
+  const etapa = getSegmentedValue('sel-etapa');
+  const select = document.getElementById('sel-responsable');
+  const opciones = config.sectores.filter(s => s.Linea === linea && s.Etapa === etapa);
+
+  select.innerHTML = '';
+  if (!opciones.length) {
+    select.innerHTML = '<option value="">Sin responsables cargados para esta combinación</option>';
+  } else {
+    select.innerHTML = '<option value="">Elegí un responsable…</option>' +
+      opciones.map(o => '<option value="' + o.ID + '">' + o.Responsable + '</option>').join('');
+  }
+  document.getElementById('txt-sector-equipos').textContent = '—';
+}
+
+function onResponsableChange(e) {
+  const id = e.target.value;
+  const linea = getSegmentedValue('sel-linea');
+  const etapa = getSegmentedValue('sel-etapa');
+  const sector = config.sectores.find(s => String(s.ID) === String(id) && s.Linea === linea && s.Etapa === etapa);
+  document.getElementById('txt-sector-equipos').textContent = sector ? sector.Sector_Equipos : '—';
+}
+
+function buildChecklist() {
+  const cont = document.getElementById('checklist-container');
+  cont.innerHTML = '';
+  config.checklist.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'checklist-item';
+    div.innerHTML =
+      '<div class="desc"><span class="n">' + item.N_Item + '</span><span>' + item.Descripcion + '</span></div>' +
+      '<div class="rating" data-item="' + item.N_Item + '">' +
+        [1, 2, 3, 4].map(v => '<button type="button" data-val="' + v + '">' + RATING_LABELS[v] + '</button>').join('') +
+      '</div>';
+    cont.appendChild(div);
+
+    div.querySelectorAll('.rating button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        div.querySelectorAll('.rating button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        itemRatings[item.N_Item] = Number(btn.dataset.val);
+      });
+    });
+  });
+}
+
+function buildNivelAplicacion() {
+  const cont = document.getElementById('nivel-container');
+  cont.innerHTML = '';
+  NIVEL_COMPONENTES.forEach(comp => {
+    const row = document.createElement('div');
+    row.className = 'nivel-row';
+    row.innerHTML =
+      '<div class="label">' + comp.label + '</div>' +
+      '<div class="segmented" data-comp="' + comp.key + '">' +
+        LEVEL_LABELS.map((lbl, i) => '<button type="button" data-val="' + (i + 1) + '">' + (i + 1) + '</button>').join('') +
+      '</div>';
+    cont.appendChild(row);
+    row.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        row.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        nivelValues[comp.key] = Number(btn.dataset.val);
+      });
+    });
+  });
+}
+
+function addAccionRow() {
+  const id = 'ac_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  accionesRows.push({ id: id, descripcion: '', responsable: '', plazoDias: 7 });
+  renderAcciones();
+}
+
+function renderAcciones() {
+  const cont = document.getElementById('acciones-container');
+  cont.innerHTML = '';
+  accionesRows.forEach(row => {
+    const div = document.createElement('div');
+    div.className = 'accion-row';
+    div.innerHTML =
+      '<button type="button" class="quitar">×</button>' +
+      '<div class="field"><label>Descripción</label><textarea rows="2" data-f="descripcion">' + row.descripcion + '</textarea></div>' +
+      '<div class="field"><label>Responsable</label><input type="text" data-f="responsable" value="' + row.responsable + '"></div>' +
+      '<div class="field"><label>Plazo (días)</label><input type="number" data-f="plazoDias" value="' + row.plazoDias + '" min="1"></div>';
+    cont.appendChild(div);
+
+    div.querySelector('.quitar').addEventListener('click', () => {
+      accionesRows = accionesRows.filter(r => r.id !== row.id);
+      renderAcciones();
+    });
+    div.querySelectorAll('[data-f]').forEach(input => {
+      input.addEventListener('input', () => {
+        row[input.dataset.f] = input.value;
+      });
+    });
+  });
+}
+
+/* ============================================================
+   GUARDAR AUDITORÍA
+   ============================================================ */
+async function guardarAuditoria() {
+  const linea = getSegmentedValue('sel-linea');
+  const etapa = getSegmentedValue('sel-etapa');
+  const responsableSel = document.getElementById('sel-responsable');
+  const responsableId = responsableSel.value;
+
+  if (!responsableId) { alert('Elegí el responsable del sector antes de guardar.'); return; }
+  if (Object.keys(itemRatings).length < config.checklist.length) {
+    alert('Faltan calificar ' + (config.checklist.length - Object.keys(itemRatings).length) + ' ítem(s) del checklist.');
+    return;
+  }
+
+  const sector = config.sectores.find(s => String(s.ID) === String(responsableId));
+
+  const items = config.checklist.map(item => ({
+    nItem: item.N_Item,
+    descripcion: item.Descripcion,
+    calificacion: itemRatings[item.N_Item],
+    peso: item.Peso
+  }));
+
+  const payload = {
+    fechaHora: document.getElementById('inp-fecha').value,
+    linea: linea,
+    etapa: etapa,
+    sectorTexto: sector ? sector.Sector_Equipos : '',
+    responsableSector: sector ? sector.Responsable : '',
+    respHigieneSeg: document.getElementById('inp-higiene').value,
+    acompanantes: document.getElementById('inp-acompanantes').value,
+    comentarios: document.getElementById('inp-comentarios').value,
+    nivelAplicacion: {
+      separar: nivelValues.separar || null,
+      organizar: nivelValues.organizar || null,
+      limpiar: nivelValues.limpiar || null,
+      estandarizar: nivelValues.estandarizar || null,
+      autodisciplina: nivelValues.autodisciplina || null
+    },
+    items: items,
+    accionesCorrectivas: accionesRows
+      .filter(r => r.descripcion.trim())
+      .map(r => ({ descripcion: r.descripcion, responsable: r.responsable, plazoDias: Number(r.plazoDias) || 7 }))
+  };
+
+  const btn = document.getElementById('btn-guardar');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  try {
+    const resp = await apiPost('nuevaAuditoria', payload);
+    if (resp.error || !resp.ok) throw new Error(resp.error || 'Error desconocido al guardar.');
+
+    lastAuditoria = { payload: payload, nota: resp.nota, auditoriaId: resp.auditoriaId, items: items };
+    mostrarResultado(resp.nota);
+  } catch (err) {
+    alert('No se pudo guardar la auditoría: ' + err.message);
+    btn.disabled = false; btn.textContent = 'Guardar auditoría';
+  }
+}
+
+function mostrarResultado(nota) {
+  const notaRedondeada = Math.round(nota * 10) / 10;
+  const el = document.getElementById('res-nota');
+  el.textContent = notaRedondeada;
+  el.style.color = notaRedondeada >= 8 ? 'var(--bien)' : notaRedondeada >= 5 ? 'var(--regular)' : 'var(--mal)';
+
+  document.getElementById('res-detalle').textContent =
+    'Sector: ' + lastAuditoria.payload.etapa + ' · ' + lastAuditoria.payload.linea +
+    '\nResponsable: ' + lastAuditoria.payload.responsableSector +
+    '\nAuditor: ' + usuario.nombre;
+
+  showScreen('result');
+}
+
+/* ============================================================
+   GENERAR PDF
+   ============================================================ */
+async function generarPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const p = lastAuditoria.payload;
+
+  doc.setFontSize(16);
+  doc.setFont(undefined, 'bold');
+  doc.text('Auditoría 5S — Gente de la Pampa S.A.', 14, 18);
+
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  const infoLines = [
+    'Línea: ' + p.linea + '    Etapa: ' + p.etapa,
+    'Responsable del sector: ' + p.responsableSector,
+    'Sector / equipos: ' + p.sectorTexto,
+    'Resp. Higiene y Seguridad: ' + (p.respHigieneSeg || '-'),
+    'Acompañantes: ' + (p.acompanantes || '-'),
+    'Fecha y hora: ' + p.fechaHora,
+    'Auditor: ' + usuario.nombre
+  ];
+  doc.text(infoLines, 14, 26);
+
+  doc.autoTable({
+    startY: 26 + infoLines.length * 5 + 4,
+    head: [['#', 'Ítem', 'Resultado']],
+    body: lastAuditoria.items.map(it => [it.nItem, it.descripcion, RATING_LABELS[it.calificacion]]),
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [61, 90, 115] },
+    columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 25 } }
+  });
+
+  let y = doc.lastAutoTable.finalY + 8;
+  doc.setFont(undefined, 'bold');
+  doc.text('Nota final: ' + (Math.round(lastAuditoria.nota * 10) / 10) + ' / 10', 14, y);
+  doc.setFont(undefined, 'normal');
+  y += 8;
+
+  doc.setFont(undefined, 'bold');
+  doc.text('Nivel de aplicación logrado', 14, y);
+  doc.setFont(undefined, 'normal');
+  y += 6;
+  NIVEL_COMPONENTES.forEach(comp => {
+    const v = p.nivelAplicacion[comp.key];
+    doc.text('· ' + comp.label + ': ' + (v ? LEVEL_LABELS[v - 1] : '—'), 16, y);
+    y += 5;
+  });
+  y += 3;
+
+  if (p.comentarios) {
+    doc.setFont(undefined, 'bold');
+    doc.text('Comentarios y observaciones', 14, y);
+    doc.setFont(undefined, 'normal');
+    y += 6;
+    const split = doc.splitTextToSize(p.comentarios, 180);
+    doc.text(split, 14, y);
+    y += split.length * 5 + 4;
+  }
+
+  if (p.accionesCorrectivas && p.accionesCorrectivas.length) {
+    doc.autoTable({
+      startY: y + 2,
+      head: [['Acción correctiva', 'Responsable', 'Plazo']],
+      body: p.accionesCorrectivas.map(a => [a.descripcion, a.responsable, a.plazoDias + ' días']),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [61, 90, 115] }
+    });
+  }
+
+  const filename = 'Auditoria_5S_' + p.responsableSector.replace(/\s+/g, '_') + '_' + p.fechaHora.slice(0, 10) + '.pdf';
+  const blob = doc.output('blob');
+  const file = new File([blob], filename, { type: 'application/pdf' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'Auditoría 5S', text: 'Resultado de la auditoría 5S — ' + p.responsableSector });
+      return;
+    } catch (e) { /* el usuario canceló el share, seguimos con la descarga */ }
+  }
+  doc.save(filename);
+}
+</script>
+</body>
+</html>
