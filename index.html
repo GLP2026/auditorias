@@ -189,7 +189,10 @@ main{max-width:640px;margin:0 auto;padding:16px;}
 <header class="app-header">
   <div class="eyebrow">Gente de la Pampa S.A.</div>
   <h1>Auditorías 5S</h1>
-  <div class="user-line hidden" id="user-line"></div>
+  <div class="user-line hidden" id="user-line">
+    <span class="dot"></span><span id="user-line-texto"></span>
+    <button type="button" id="btn-cambiar-usuario" style="margin-left:8px;background:none;border:none;color:var(--accent);font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer;padding:0;">Cambiar</button>
+  </div>
 </header>
 
 <main>
@@ -197,14 +200,26 @@ main{max-width:640px;margin:0 auto;padding:16px;}
   <!-- ===================== PANTALLA: CARGANDO ===================== -->
   <section id="screen-loading" class="status-screen">
     <div class="spinner"></div>
-    <h2>Verificando acceso…</h2>
-    <p>Conectando con el sistema y confirmando tu usuario.</p>
+    <h2>Cargando…</h2>
+    <p>Conectando con el sistema.</p>
   </section>
 
-  <!-- ===================== PANTALLA: SIN ACCESO ===================== -->
+  <!-- ===================== PANTALLA: ERROR ===================== -->
   <section id="screen-unauthorized" class="status-screen hidden">
-    <h2 id="unauth-title">No pudimos verificar tu acceso</h2>
+    <h2 id="unauth-title">No pudimos conectar</h2>
     <p id="unauth-msg"></p>
+  </section>
+
+  <!-- ===================== PANTALLA: ELEGIR USUARIO ===================== -->
+  <section id="screen-selector" class="hidden">
+    <div class="card">
+      <h2>¿Quién sos?</h2>
+      <div class="field">
+        <label>Elegí tu nombre de la lista</label>
+        <select id="sel-usuario"><option value="">Elegí tu nombre…</option></select>
+      </div>
+    </div>
+    <button type="button" class="btn-primary" id="btn-confirmar-usuario">Continuar</button>
   </section>
 
   <!-- ===================== PANTALLA: FORMULARIO ===================== -->
@@ -288,7 +303,7 @@ main{max-width:640px;margin:0 auto;padding:16px;}
    CONFIGURACIÓN — EDITAR ACÁ
    ============================================================ */
 // Pegá la URL del Web App que copiaste al deployar el Code.gs (README_Setup_Backend.md, paso 6)
-const API_URL = 'https://script.google.com/macros/s/AKfycbzOgNbk009Ougmxv91S4_ByaAdxgPTjlvNIYAJ7G8hFyGg8zWxSvJOJ2hOQ1emST1r_/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzDqq_KE0ss5acHEp8cG-nqrqQiYJ57XoX49aMjFA5KVIMOPKAnAjv0JciYoDqPdsIc/exec';
 
 // Nombres de los 4 niveles de "Nivel de aplicación logrado". Tu Excel solo tenía
 // columnas numeradas 1-4 sin etiqueta — si tenés nombres definidos para esos niveles,
@@ -320,31 +335,64 @@ let lastAuditoria = null;    // payload + resultado, para el PDF
    ============================================================ */
 window.addEventListener('DOMContentLoaded', init);
 
+const USUARIO_STORAGE_KEY = 'auditorias5s_usuario_email';
+
 async function init() {
   if (API_URL.indexOf('PEGAR_AQUI') !== -1) {
     showUnauthorized('Falta configurar la app', 'Todavía no se pegó la URL del backend (API_URL) en index.html. Avisale al administrador del sistema.');
     return;
   }
   try {
-    const who = await apiGet('whoami');
-    if (!who.autorizado) {
-      showUnauthorized('Tu cuenta no está habilitada', (who.error || 'Usuario no habilitado.') + (who.email ? ('\n\nCuenta detectada: ' + who.email) : ''));
-      return;
-    }
-    usuario = who;
-    document.getElementById('user-line').classList.remove('hidden');
-    document.getElementById('user-line').innerHTML = '<span class="dot"></span> ' + usuario.nombre + ' · ' + usuario.rol;
-
     config = await apiGet('config');
-    buildForm();
-    showScreen('form');
   } catch (err) {
-    showUnauthorized('No se pudo conectar', 'Revisá tu conexión a internet y que hayas iniciado sesión con tu cuenta de Google del trabajo en este navegador.\n\nDetalle técnico: ' + err.message);
+    showUnauthorized('No se pudo conectar', 'Revisá tu conexión a internet.\n\nDetalle técnico: ' + err.message);
+    return;
+  }
+
+  document.getElementById('btn-confirmar-usuario').addEventListener('click', confirmarUsuario);
+  document.getElementById('btn-cambiar-usuario').addEventListener('click', cambiarUsuario);
+
+  const savedEmail = localStorage.getItem(USUARIO_STORAGE_KEY);
+  const encontrado = savedEmail && config.usuarios.find(u => String(u.Email).toLowerCase() === savedEmail.toLowerCase());
+  if (encontrado) {
+    usuario = encontrado;
+    entrarConUsuario();
+  } else {
+    mostrarSelectorUsuario();
   }
 }
 
+function mostrarSelectorUsuario() {
+  const select = document.getElementById('sel-usuario');
+  select.innerHTML = '<option value="">Elegí tu nombre…</option>' +
+    config.usuarios.map(u => '<option value="' + u.Email + '">' + u.Nombre + (u.Rol ? ' — ' + u.Rol : '') + '</option>').join('');
+  showScreen('selector');
+}
+
+function confirmarUsuario() {
+  const email = document.getElementById('sel-usuario').value;
+  if (!email) { alert('Elegí tu nombre de la lista antes de continuar.'); return; }
+  usuario = config.usuarios.find(u => u.Email === email);
+  localStorage.setItem(USUARIO_STORAGE_KEY, email);
+  entrarConUsuario();
+}
+
+function cambiarUsuario() {
+  localStorage.removeItem(USUARIO_STORAGE_KEY);
+  usuario = null;
+  document.getElementById('user-line').classList.add('hidden');
+  mostrarSelectorUsuario();
+}
+
+function entrarConUsuario() {
+  document.getElementById('user-line').classList.remove('hidden');
+  document.getElementById('user-line-texto').textContent = usuario.Nombre + (usuario.Rol ? ' · ' + usuario.Rol : '');
+  buildForm();
+  showScreen('form');
+}
+
 function showScreen(name) {
-  ['loading', 'unauthorized', 'form', 'result'].forEach(s => {
+  ['loading', 'unauthorized', 'selector', 'form', 'result'].forEach(s => {
     document.getElementById('screen-' + s).classList.toggle('hidden', s !== name);
   });
 }
@@ -544,6 +592,8 @@ async function guardarAuditoria() {
   }));
 
   const payload = {
+    auditorEmail: usuario.Email,
+    auditorNombre: usuario.Nombre,
     fechaHora: document.getElementById('inp-fecha').value,
     linea: linea,
     etapa: etapa,
@@ -589,7 +639,7 @@ function mostrarResultado(nota) {
   document.getElementById('res-detalle').textContent =
     'Sector: ' + lastAuditoria.payload.etapa + ' · ' + lastAuditoria.payload.linea +
     '\nResponsable: ' + lastAuditoria.payload.responsableSector +
-    '\nAuditor: ' + usuario.nombre;
+    '\nAuditor: ' + usuario.Nombre;
 
   showScreen('result');
 }
@@ -615,7 +665,7 @@ async function generarPDF() {
     'Resp. Higiene y Seguridad: ' + (p.respHigieneSeg || '-'),
     'Acompañantes: ' + (p.acompanantes || '-'),
     'Fecha y hora: ' + p.fechaHora,
-    'Auditor: ' + usuario.nombre
+    'Auditor: ' + usuario.Nombre
   ];
   doc.text(infoLines, 14, 26);
 
