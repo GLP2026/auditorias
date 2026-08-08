@@ -344,8 +344,6 @@ async function init() {
   }
   try {
     config = await apiGet('config');
-    console.log('CONFIG RECIBIDO:', config);
-    console.log('TIENE USUARIOS?', config.usuarios);
     if (config.error) throw new Error(config.error);
   } catch (err) {
     showUnauthorized('No se pudo conectar', 'Revisá tu conexión a internet.\n\nDetalle técnico: ' + err.message);
@@ -409,10 +407,23 @@ function showUnauthorized(title, msg) {
 /* ============================================================
    API HELPERS
    ============================================================ */
-async function apiGet(action, params) {
-  const qs = new URLSearchParams(Object.assign({ action: action, _: Date.now() }, params || {}));
-  const res = await fetch(API_URL + '?' + qs.toString(), { cache: 'no-store' });
-  return res.json();
+let jsonpContador = 0;
+
+function apiGet(action, params) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'jsonpCb_' + (jsonpContador++) + '_' + Date.now();
+    const qs = new URLSearchParams(Object.assign({ action: action, callback: cbName }, params || {}));
+
+    const script = document.createElement('script');
+    script.src = API_URL + '?' + qs.toString();
+
+    const limpiar = () => { delete window[cbName]; script.remove(); };
+
+    window[cbName] = (data) => { limpiar(); resolve(data); };
+    script.onerror = () => { limpiar(); reject(new Error('No se pudo conectar con el backend.')); };
+
+    document.body.appendChild(script);
+  });
 }
 
 async function apiPost(action, data) {
