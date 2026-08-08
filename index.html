@@ -14,6 +14,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <!-- Exportar historial a Excel -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Gráficos de seguimiento -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 
 <style>
 /* ============================================================
@@ -202,6 +204,34 @@ main{max-width:640px;margin:0 auto;padding:16px;}
 }
 .btn-fila-pdf:disabled{opacity:.5;}
 
+/* seguimiento */
+.seg-stats{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.seg-stats .stat{
+  flex:1;min-width:90px;background:#fff;border:1.5px solid var(--line);border-radius:10px;
+  padding:12px;text-align:center;
+}
+.seg-stats .stat .num{font-size:22px;font-weight:800;color:var(--ink);}
+.seg-stats .stat .lbl{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-top:2px;}
+.seg-foco{
+  background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;
+  font-size:13.5px;line-height:1.5;
+}
+.seg-foco b{color:var(--steel-dark);}
+.seg-tendencia{font-weight:800;}
+.seg-tendencia.up{color:var(--bien);}
+.seg-tendencia.down{color:var(--mal);}
+.seg-tendencia.flat{color:var(--ink-soft);}
+.seg-equipo-tabla{width:100%;border-collapse:collapse;font-size:13px;}
+.seg-equipo-tabla th{
+  text-align:left;padding:9px 10px;background:#F7F6F3;color:var(--ink-soft);
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:700;
+  border-bottom:1.5px solid var(--line);
+}
+.seg-equipo-tabla td{padding:9px 10px;border-bottom:1px solid var(--line);}
+.seg-equipo-tabla tr:last-child td{border-bottom:none;}
+.seg-equipo-tabla tr.foco-bajo{background:#FBEDEB;}
+.seg-equipo-tabla .nombre{font-weight:700;}
+
 /* status screens */
 .status-screen{text-align:center;padding:60px 24px;}
 .status-screen .spinner{
@@ -223,7 +253,10 @@ main{max-width:640px;margin:0 auto;padding:16px;}
   <div class="eyebrow">Gente de la Pampa S.A.</div>
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
     <h1>Auditorías 5S</h1>
-    <button type="button" id="btn-ver-historial" class="hidden" style="background:none;border:1.5px solid var(--accent);color:var(--accent);font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:20px;cursor:pointer;">Historial</button>
+    <div style="display:flex;gap:6px;">
+      <button type="button" id="btn-ver-seguimiento" class="hidden" style="background:none;border:1.5px solid var(--accent);color:var(--accent);font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:20px;cursor:pointer;">Seguimiento</button>
+      <button type="button" id="btn-ver-historial" class="hidden" style="background:none;border:1.5px solid var(--accent);color:var(--accent);font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:20px;cursor:pointer;">Historial</button>
+    </div>
   </div>
   <div class="user-line hidden" id="user-line">
     <span class="dot"></span><span id="user-line-texto"></span>
@@ -254,6 +287,11 @@ main{max-width:640px;margin:0 auto;padding:16px;}
         <label>Elegí tu nombre de la lista</label>
         <select id="sel-usuario"><option value="">Elegí tu nombre…</option></select>
       </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="inp-password-usuario" placeholder="Tu contraseña">
+      </div>
+      <p id="selector-error" style="color:var(--mal);font-size:13px;margin:0;"></p>
     </div>
     <button type="button" class="btn-primary" id="btn-confirmar-usuario">Continuar</button>
   </section>
@@ -348,6 +386,22 @@ main{max-width:640px;margin:0 auto;padding:16px;}
     <button type="button" class="btn-secondary" id="btn-volver-form">Volver al formulario</button>
   </section>
 
+  <!-- ===================== PANTALLA: SEGUIMIENTO ===================== -->
+  <section id="screen-seguimiento" class="hidden">
+    <div class="card" style="padding:14px;">
+      <div class="segmented" id="sel-seguimiento-modo" style="margin-bottom:12px;">
+        <button type="button" data-value="operario" class="active">Por operario</button>
+        <button type="button" data-value="supervisor">Por supervisor</button>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label id="lbl-seguimiento-select">Elegí un operario</label>
+        <select id="sel-seguimiento-objetivo"><option value="">Elegí…</option></select>
+      </div>
+    </div>
+    <div id="seguimiento-resultado"></div>
+    <button type="button" class="btn-secondary" id="btn-volver-form-2">Volver al formulario</button>
+  </section>
+
   <!-- ===================== PANTALLA: RESULTADO ===================== -->
   <section id="screen-result" class="hidden">
     <div class="card nota-gauge">
@@ -401,6 +455,8 @@ let firmaAuditorPad = null;
 let firmaAuditadoPad = null;
 let historialRegistros = [];
 let historialLineaActiva = 'Soja';
+let seguimientoModo = 'operario';
+let seguimientoChart = null;
 
 /* ============================================================
    INIT
@@ -444,12 +500,28 @@ function mostrarSelectorUsuario() {
   showScreen('selector');
 }
 
-function confirmarUsuario() {
+async function confirmarUsuario() {
   const email = document.getElementById('sel-usuario').value;
-  if (!email) { alert('Elegí tu nombre de la lista antes de continuar.'); return; }
-  usuario = config.usuarios.find(u => u.Email === email);
-  localStorage.setItem(USUARIO_STORAGE_KEY, email);
-  entrarConUsuario();
+  const password = document.getElementById('inp-password-usuario').value;
+  const errorEl = document.getElementById('selector-error');
+  errorEl.textContent = '';
+
+  if (!email) { errorEl.textContent = 'Elegí tu nombre de la lista antes de continuar.'; return; }
+  if (!password) { errorEl.textContent = 'Ingresá tu contraseña.'; return; }
+
+  const btn = document.getElementById('btn-confirmar-usuario');
+  btn.disabled = true; btn.textContent = 'Verificando…';
+  try {
+    const resp = await apiPost('verificarUsuario', { email: email, password: password });
+    if (!resp.ok) throw new Error(resp.error || 'No se pudo verificar el usuario.');
+    usuario = config.usuarios.find(u => u.Email === email);
+    localStorage.setItem(USUARIO_STORAGE_KEY, email);
+    entrarConUsuario();
+  } catch (err) {
+    errorEl.textContent = err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Continuar';
+  }
 }
 
 function cambiarUsuario() {
@@ -463,12 +535,13 @@ function entrarConUsuario() {
   document.getElementById('user-line').classList.remove('hidden');
   document.getElementById('user-line-texto').textContent = usuario.Nombre + (usuario.Rol ? ' · ' + usuario.Rol : '');
   document.getElementById('btn-ver-historial').classList.remove('hidden');
+  document.getElementById('btn-ver-seguimiento').classList.remove('hidden');
   buildForm();
   showScreen('form');
 }
 
 function showScreen(name) {
-  ['loading', 'unauthorized', 'selector', 'form', 'result', 'historial'].forEach(s => {
+  ['loading', 'unauthorized', 'selector', 'form', 'result', 'historial', 'seguimiento'].forEach(s => {
     document.getElementById('screen-' + s).classList.toggle('hidden', s !== name);
   });
 }
@@ -533,6 +606,25 @@ function buildForm() {
       historialLineaActiva = btn.dataset.value;
       renderHistorialTabla();
     });
+  });
+
+  document.getElementById('btn-ver-seguimiento').addEventListener('click', mostrarSeguimiento);
+  document.getElementById('btn-volver-form-2').addEventListener('click', () => showScreen('form'));
+  document.querySelectorAll('#sel-seguimiento-modo button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#sel-seguimiento-modo button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      seguimientoModo = btn.dataset.value;
+      poblarSelectorSeguimiento();
+      document.getElementById('seguimiento-resultado').innerHTML =
+        '<p style="color:var(--ink-soft);font-size:14px;padding:14px;">Elegí ' + (seguimientoModo === 'operario' ? 'un operario' : 'un supervisor') + ' para ver su tendencia.</p>';
+    });
+  });
+  document.getElementById('sel-seguimiento-objetivo').addEventListener('change', (e) => {
+    const valor = e.target.value;
+    if (!valor) return;
+    if (seguimientoModo === 'operario') renderSeguimientoOperario(valor);
+    else renderSeguimientoSupervisor(valor);
   });
 }
 
@@ -882,6 +974,207 @@ function exportarExcel() {
 }
 
 /* ============================================================
+   SEGUIMIENTO — por operario y por supervisor
+   ============================================================ */
+
+function nivelColumnName(key) {
+  return 'Nivel_' + key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function colorCssPorNota(nota) {
+  const c = colorPorNota(nota);
+  return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+}
+
+// Compara el promedio de la primera mitad de las notas contra la segunda
+// mitad, para estimar si la tendencia es de mejora, empeoramiento o estable.
+function calcularTendencia(notas) {
+  if (notas.length < 2) return { dir: 'flat', texto: 'Sin datos suficientes' };
+  const mitad = Math.max(Math.floor(notas.length / 2), 1);
+  const primera = notas.slice(0, mitad);
+  const segunda = notas.slice(notas.length - mitad);
+  const prom = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const diff = prom(segunda) - prom(primera);
+  if (Math.abs(diff) < 0.3) return { dir: 'flat', texto: 'Estable' };
+  return diff > 0 ? { dir: 'up', texto: 'Mejorando' } : { dir: 'down', texto: 'Empeorando' };
+}
+
+function renderGraficoLinea(canvasId, labels, data, colorLinea) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  if (seguimientoChart) { seguimientoChart.destroy(); seguimientoChart = null; }
+  seguimientoChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Nota', data: data, borderColor: colorLinea,
+        backgroundColor: colorLinea.replace('rgb', 'rgba').replace(')', ',0.15)'),
+        tension: 0.3, fill: true, pointRadius: 4, pointBackgroundColor: colorLinea
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { min: 0, max: 10, ticks: { stepSize: 2 } } },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+async function mostrarSeguimiento() {
+  showScreen('seguimiento');
+  const cont = document.getElementById('seguimiento-resultado');
+  cont.innerHTML = '<p style="color:var(--ink-soft);font-size:14px;padding:14px;">Cargando…</p>';
+  document.getElementById('sel-seguimiento-objetivo').value = '';
+  try {
+    const res = await fetch(API_URL + '?action=historial&_=' + Date.now());
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    historialRegistros = data.registros || [];
+  } catch (err) {
+    cont.innerHTML = '<p style="color:var(--mal);font-size:14px;padding:14px;">No se pudo cargar el historial.<br>' + err.message + '</p>';
+    return;
+  }
+  poblarSelectorSeguimiento();
+  cont.innerHTML = '<p style="color:var(--ink-soft);font-size:14px;padding:14px;">Elegí ' +
+    (seguimientoModo === 'operario' ? 'un operario' : 'un supervisor') + ' para ver su tendencia.</p>';
+}
+
+function poblarSelectorSeguimiento() {
+  const sel = document.getElementById('sel-seguimiento-objetivo');
+  document.getElementById('lbl-seguimiento-select').textContent = seguimientoModo === 'operario' ? 'Elegí un operario' : 'Elegí un supervisor';
+
+  let opciones;
+  if (seguimientoModo === 'operario') {
+    opciones = [...new Set(config.sectores.map(s => s.Responsable))].filter(Boolean).sort();
+  } else {
+    opciones = [...new Set(config.sectores.map(s => s.Supervisor))].filter(Boolean).sort();
+  }
+  sel.innerHTML = '<option value="">Elegí…</option>' + opciones.map(n => '<option value="' + n + '">' + n + '</option>').join('');
+}
+
+function renderSeguimientoOperario(nombre) {
+  const cont = document.getElementById('seguimiento-resultado');
+  const registros = historialRegistros
+    .filter(r => r.Responsable_Sector === nombre)
+    .sort((a, b) => new Date(a.Fecha_Hora) - new Date(b.Fecha_Hora));
+
+  if (!registros.length) {
+    cont.innerHTML = '<p style="color:var(--ink-soft);font-size:14px;padding:14px;">Todavía no hay auditorías registradas para ' + nombre + '.</p>';
+    return;
+  }
+
+  const notas = registros.map(r => Math.round(Number(r.Nota_Final) * 10) / 10);
+  const labels = registros.map(r => new Date(r.Fecha_Hora).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }));
+  const promedio = Math.round((notas.reduce((a, b) => a + b, 0) / notas.length) * 10) / 10;
+  const ultima = notas[notas.length - 1];
+  const tendencia = calcularTendencia(notas);
+  const flecha = tendencia.dir === 'up' ? '↑' : tendencia.dir === 'down' ? '↓' : '→';
+
+  const nivelesProm = NIVEL_COMPONENTES.map(c => {
+    const col = nivelColumnName(c.key);
+    const vals = registros.map(r => Number(r[col])).filter(v => v > 0);
+    return { label: c.label, prom: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
+  }).filter(n => n.prom !== null);
+
+  let focoTexto = 'Todavía no hay datos de nivel de aplicación para calcular un foco.';
+  if (nivelesProm.length) {
+    nivelesProm.sort((a, b) => a.prom - b.prom);
+    const peor = nivelesProm[0];
+    focoTexto = 'El componente con nivel más bajo es <b>' + peor.label + '</b> (promedio ' + peor.prom.toFixed(1) + ' de 4) — es donde más conviene reforzar.';
+  }
+
+  cont.innerHTML =
+    '<div class="seg-stats">' +
+      '<div class="stat"><div class="num">' + registros.length + '</div><div class="lbl">Auditorías</div></div>' +
+      '<div class="stat"><div class="num">' + promedio + '</div><div class="lbl">Promedio</div></div>' +
+      '<div class="stat"><div class="num">' + ultima + '</div><div class="lbl">Última</div></div>' +
+      '<div class="stat"><div class="num seg-tendencia ' + tendencia.dir + '">' + flecha + '</div><div class="lbl">' + tendencia.texto + '</div></div>' +
+    '</div>' +
+    '<div class="card"><canvas id="seg-chart" height="180"></canvas></div>' +
+    '<div class="seg-foco">🎯 <b>Foco sugerido:</b> ' + focoTexto + '</div>';
+
+  renderGraficoLinea('seg-chart', labels, notas, colorCssPorNota(promedio));
+}
+
+function renderSeguimientoSupervisor(nombreSupervisor) {
+  const cont = document.getElementById('seguimiento-resultado');
+  const operarios = [...new Set(config.sectores.filter(s => s.Supervisor === nombreSupervisor).map(s => s.Responsable))];
+
+  if (!operarios.length) {
+    cont.innerHTML = '<p style="color:var(--ink-soft);font-size:14px;padding:14px;">No hay operarios asignados a ' + nombreSupervisor + ' en Config_Sectores.</p>';
+    return;
+  }
+
+  const registrosEquipo = historialRegistros
+    .filter(r => operarios.includes(r.Responsable_Sector))
+    .sort((a, b) => new Date(a.Fecha_Hora) - new Date(b.Fecha_Hora));
+
+  const filasOperarios = operarios.map(nombre => {
+    const regs = historialRegistros
+      .filter(r => r.Responsable_Sector === nombre)
+      .sort((a, b) => new Date(a.Fecha_Hora) - new Date(b.Fecha_Hora));
+    const notas = regs.map(r => Math.round(Number(r.Nota_Final) * 10) / 10);
+    const promedio = notas.length ? Math.round((notas.reduce((a, b) => a + b, 0) / notas.length) * 10) / 10 : null;
+    return {
+      nombre: nombre, cantidad: regs.length,
+      promedio: promedio, ultima: notas.length ? notas[notas.length - 1] : null,
+      tendencia: notas.length >= 2 ? calcularTendencia(notas) : null
+    };
+  });
+
+  filasOperarios.sort((a, b) => {
+    if (a.promedio === null && b.promedio === null) return 0;
+    if (a.promedio === null) return 1;
+    if (b.promedio === null) return -1;
+    return a.promedio - b.promedio;
+  });
+
+  const conDatos = filasOperarios.filter(f => f.promedio !== null);
+  const promedioEquipo = conDatos.length ? Math.round((conDatos.reduce((a, f) => a + f.promedio, 0) / conDatos.length) * 10) / 10 : null;
+
+  let html = '<div class="seg-stats">' +
+    '<div class="stat"><div class="num">' + registrosEquipo.length + '</div><div class="lbl">Auditorías del equipo</div></div>' +
+    '<div class="stat"><div class="num">' + (promedioEquipo !== null ? promedioEquipo : '—') + '</div><div class="lbl">Promedio equipo</div></div>' +
+    '<div class="stat"><div class="num">' + operarios.length + '</div><div class="lbl">Operarios</div></div>' +
+  '</div>';
+
+  if (registrosEquipo.length) html += '<div class="card"><canvas id="seg-chart" height="180"></canvas></div>';
+
+  if (conDatos.length) {
+    const peor = conDatos[0];
+    const enBaja = peor.tendencia && peor.tendencia.dir === 'down';
+    html += '<div class="seg-foco">🎯 <b>Con quién conviene hablar primero:</b> ' + peor.nombre +
+      ' — promedio ' + peor.promedio + '/10' + (enBaja ? ' y en baja' : '') + '.</div>';
+  }
+
+  html += '<div class="card" style="padding:0;overflow:hidden;"><div style="overflow-x:auto;"><table class="seg-equipo-tabla"><thead><tr>' +
+    '<th>Operario</th><th>Auditorías</th><th>Promedio</th><th>Última</th><th>Tendencia</th>' +
+    '</tr></thead><tbody>';
+  filasOperarios.forEach(f => {
+    const esBajo = f.promedio !== null && f.promedio < 5;
+    const tendTexto = f.tendencia
+      ? '<span class="seg-tendencia ' + f.tendencia.dir + '">' + (f.tendencia.dir === 'up' ? '↑ Mejorando' : f.tendencia.dir === 'down' ? '↓ Empeorando' : '→ Estable') + '</span>'
+      : (f.cantidad ? '—' : 'Sin auditorías');
+    html += '<tr class="' + (esBajo ? 'foco-bajo' : '') + '">' +
+      '<td class="nombre">' + f.nombre + '</td>' +
+      '<td>' + f.cantidad + '</td>' +
+      '<td>' + (f.promedio !== null ? f.promedio : '—') + '</td>' +
+      '<td>' + (f.ultima !== null ? f.ultima : '—') + '</td>' +
+      '<td>' + tendTexto + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+
+  cont.innerHTML = html;
+
+  if (registrosEquipo.length) {
+    const labels = registrosEquipo.map(r => new Date(r.Fecha_Hora).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }));
+    const notas = registrosEquipo.map(r => Math.round(Number(r.Nota_Final) * 10) / 10);
+    renderGraficoLinea('seg-chart', labels, notas, colorCssPorNota(promedioEquipo !== null ? promedioEquipo : 5));
+  }
+}
+
+/* ============================================================
    CONSTRUIR / DESCARGAR / COMPARTIR PDF
    ============================================================ */
 
@@ -941,7 +1234,7 @@ function construirPDF(auditoria) {
   let y = 55;
 
   // ---------- Grilla de datos ----------
-  const estiloEtiqueta = { fontStyle: 'bold', fillColor: grisFondo, textColor: [40, 64, 79], cellWidth: 32 };
+  const estiloEtiqueta = { fontStyle: 'bold', fillColor: grisFondo, textColor: [40, 64, 79], cellWidth: 40 };
   doc.autoTable({
     startY: y,
     body: [
@@ -959,7 +1252,7 @@ function construirPDF(auditoria) {
     body: [['SECTOR / EQUIPOS', p.sectorTexto || '-']],
     theme: 'grid',
     styles: { fontSize: 9.5, cellPadding: 3.2, lineColor: [228, 225, 218], lineWidth: 0.3 },
-    columnStyles: { 0: { fontStyle: 'bold', fillColor: grisFondo, textColor: [40, 64, 79], cellWidth: 32 } }
+    columnStyles: { 0: { fontStyle: 'bold', fillColor: grisFondo, textColor: [40, 64, 79], cellWidth: 40 } }
   });
   y = doc.lastAutoTable.finalY;
 
@@ -986,20 +1279,19 @@ function construirPDF(auditoria) {
   });
   y = doc.lastAutoTable.finalY + 10;
 
-  // ---------- Nivel de aplicación ----------
-  if (y > 250) { doc.addPage(); y = 20; }
+  // ---------- Nivel de aplicación (en filas, no en columnas) ----------
+  if (y > 240) { doc.addPage(); y = 20; }
   pdfTituloSeccion(doc, y, 'Nivel de aplicación logrado');
   y += 5;
   doc.autoTable({
     startY: y,
-    head: [NIVEL_COMPONENTES.map(c => c.label)],
-    body: [NIVEL_COMPONENTES.map(c => {
+    body: NIVEL_COMPONENTES.map(c => {
       const v = p.nivelAplicacion[c.key];
-      return v ? LEVEL_LABELS[v - 1] : '—';
-    })],
+      return [c.label.toUpperCase(), v ? LEVEL_LABELS[v - 1] : '—'];
+    }),
     theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 3, halign: 'center', lineColor: [228, 225, 218], lineWidth: 0.3 },
-    headStyles: { fillColor: [61, 90, 115], textColor: [255, 255, 255], fontSize: 8.3 }
+    styles: { fontSize: 9.5, cellPadding: 3, lineColor: [228, 225, 218], lineWidth: 0.3 },
+    columnStyles: { 0: { fontStyle: 'bold', fillColor: grisFondo, textColor: [40, 64, 79], cellWidth: 40 } }
   });
   y = doc.lastAutoTable.finalY + 10;
 
