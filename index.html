@@ -343,10 +343,11 @@ async function init() {
     return;
   }
   try {
-    config = await apiGet('config');
-    if (config.error) throw new Error(config.error);
+    const res = await fetch('./config.json?_=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('No se pudo leer config.json (status ' + res.status + ')');
+    config = await res.json();
   } catch (err) {
-    showUnauthorized('No se pudo conectar', 'Revisá tu conexión a internet.\n\nDetalle técnico: ' + err.message);
+    showUnauthorized('No se pudo conectar', 'Revisá que el archivo config.json esté subido en el mismo repositorio que index.html.\n\nDetalle técnico: ' + err.message);
     return;
   }
 
@@ -407,24 +408,13 @@ function showUnauthorized(title, msg) {
 /* ============================================================
    API HELPERS
    ============================================================ */
-let jsonpContador = 0;
-
-function apiGet(action, params) {
-  return new Promise((resolve, reject) => {
-    const cbName = 'jsonpCb_' + (jsonpContador++) + '_' + Date.now();
-    const qs = new URLSearchParams(Object.assign({ action: action, callback: cbName }, params || {}));
-
-    const script = document.createElement('script');
-    script.src = API_URL + '?' + qs.toString();
-
-    const limpiar = () => { delete window[cbName]; script.remove(); };
-
-    window[cbName] = (data) => { limpiar(); resolve(data); };
-    script.onerror = () => { limpiar(); reject(new Error('No se pudo conectar con el backend.')); };
-
-    document.body.appendChild(script);
-  });
-}
+// NOTA: para pedidos GET al backend en vivo (ej. historial de auditorías para
+// gráficos) probamos JSONP acá, pero Apps Script sirve la respuesta con
+// Content-Type: application/json incluso con MimeType.JAVASCRIPT — el navegador
+// se niega a ejecutarla como <script>. Cuando armemos la pantalla de historial
+// hay que resolver esto de otra forma (por ejemplo, revisar si un fetch()
+// normal al endpoint funciona para ese caso puntual, ya que config.json ahora
+// se sirve como archivo estático y no pasa por este problema).
 
 async function apiPost(action, data) {
   // Content-Type text/plain evita el preflight OPTIONS, que Apps Script no maneja.
