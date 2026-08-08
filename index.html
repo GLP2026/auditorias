@@ -401,11 +401,12 @@ async function init() {
     return;
   }
   try {
-    const res = await fetch('./config.json?_=' + Date.now(), { cache: 'no-store' });
-    if (!res.ok) throw new Error('No se pudo leer config.json (status ' + res.status + ')');
+    const res = await fetch(API_URL + '?action=config&_=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('El backend respondió con error ' + res.status);
     config = await res.json();
+    if (config.error) throw new Error(config.error);
   } catch (err) {
-    showUnauthorized('No se pudo conectar', 'Revisá que el archivo config.json esté subido en el mismo repositorio que index.html.\n\nDetalle técnico: ' + err.message);
+    showUnauthorized('No se pudo conectar', 'Revisá tu conexión a internet y que la planilla de Google Sheets esté publicada.\n\nDetalle técnico: ' + err.message);
     return;
   }
 
