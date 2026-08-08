@@ -344,6 +344,8 @@ async function init() {
   }
   try {
     config = await apiGet('config');
+    console.log('CONFIG RECIBIDO:', config);
+    console.log('TIENE USUARIOS?', config.usuarios);
     if (config.error) throw new Error(config.error);
   } catch (err) {
     showUnauthorized('No se pudo conectar', 'Revisá tu conexión a internet.\n\nDetalle técnico: ' + err.message);
